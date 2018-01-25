@@ -34,8 +34,8 @@ module Gatecoin
       opts = {
         Code: pair,
         Way: side,
-        Amount: size.to_s,
-        Price: price.to_s,
+        Amount: size.to_f.to_s,
+        Price: price.to_f.to_s,
       }
       order = post('/Trade/Orders', opts)
 
