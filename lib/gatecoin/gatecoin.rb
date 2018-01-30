@@ -64,6 +64,13 @@ module Gatecoin
       raise Gatecoin::CancelOrderException.new(e.message)
     end
 
+    def deposit_wallets
+      addresses = get('/ElectronicWallet/DepositWallets')
+
+      raise addresses['responseStatus']['message'] unless addresses['addresses']
+      addresses['addresses']
+    end
+
     private
 
     def signature(timestamp, verb, content_type, path)
