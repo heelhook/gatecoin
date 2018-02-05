@@ -71,6 +71,26 @@ module Gatecoin
       addresses['addresses']
     end
 
+    def withdrawal(currency:, address:, amount:, comment: nil, validation: nil)
+      opts = {
+        AddressName: address,
+        Amount: amount,
+      }
+
+      opts[:Comment] = comment if comment
+      opts[:ValidationCode] = validation if validation
+
+      status = post("/ElectronicWallet/withdrawals/#{currency}", opts)
+
+      if status['responseStatus'] && status['responseStatus']['errorCode']
+        error = status['responseStatus']['message']
+        error ||= status['responseStatus']
+        raise Gatecoin::WithdrawalException.new(error)
+      end
+
+      status
+    end
+
     private
 
     def signature(timestamp, verb, content_type, path)
