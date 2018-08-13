@@ -9,10 +9,11 @@ module Gatecoin
                 :secret,
                 :url
 
-    def initialize(key:, secret:, url: 'https://api.gatecoin.com')
+    def initialize(key:, secret:, url: 'https://api.gatecoin.com', timeout: 10)
       @key = key
       @secret = secret
       @url = url
+      @timeout = timeout
     end
 
     def balances
@@ -42,12 +43,12 @@ module Gatecoin
       if !order['clOrderId']
         error = order['responseStatus']['message'] if order['responseStatus'] && order['responseStatus']['message']
         error ||= order
-        raise Gatecoin::CreateOrderException.new(error)
+        raise Gatecoin::CreateOrderException, error
       end
 
       order
-    rescue => e
-      raise Gatecoin::CreateOrderException.new(e.message)
+    rescue StandardError => e
+      raise Gatecoin::CreateOrderException, e.message
     end
 
     def cancel_order(id)
@@ -56,12 +57,12 @@ module Gatecoin
       if status['responseStatus'] && status['responseStatus']['errorCode']
         error = status['responseStatus']['message']
         error ||= status['responseStatus']
-        raise Gatecoin::CancelOrderException.new(error)
+        raise Gatecoin::CancelOrderException, error
       end
 
       status
-    rescue => e
-      raise Gatecoin::CancelOrderException.new(e.message)
+    rescue StandardError => e
+      raise Gatecoin::CancelOrderException, e.message
     end
 
     def deposit_wallets
@@ -85,7 +86,7 @@ module Gatecoin
       if status['responseStatus'] && status['responseStatus']['errorCode']
         error = status['responseStatus']['message']
         error ||= status['responseStatus']
-        raise Gatecoin::WithdrawalException.new(error)
+        raise Gatecoin::WithdrawalException, error
       end
 
       status
@@ -97,14 +98,19 @@ module Gatecoin
       content_type = '' if verb == 'GET'
       str = "#{verb}#{@url}#{path}#{content_type}#{timestamp}".downcase
       hmac = OpenSSL::HMAC.digest('sha256', @secret, str)
-      a = Base64.encode64(hmac).to_s.gsub("\n",'')
+      Base64.encode64(hmac).to_s.delete("\n")
     end
 
     def get(path, opts = {})
       uri = URI.parse("#{@url}#{path}")
       uri.query = URI.encode_www_form(opts[:params]) if opts[:params]
 
-      response = RestClient.get(uri.to_s, auth_headers(uri.request_uri, 'GET'))
+      response = RestClient::Request.execute(
+        method: :get,
+        url: uri.to_s,
+        headers: auth_headers(uri.request_uri, 'GET'),
+        timeout: @timeout,
+      )
 
       if !opts[:skip_json]
         JSON.parse(response.body)
@@ -142,7 +148,7 @@ module Gatecoin
       {
         'Content-Type' => content_type,
         'API_PUBLIC_KEY' => @key,
-        'API_REQUEST_DATE' => "#{timestamp}",
+        'API_REQUEST_DATE' => timestamp,
         'API_REQUEST_SIGNATURE' => sign,
       }
     end
